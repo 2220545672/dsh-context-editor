@@ -64,10 +64,10 @@ While writing this I fixed an annoying one: previously, select-all (Ctrl/Cmd+A) 
 
 ## dsh-docker integration
 
-- A release here triggers `.github/workflows/notify-dsh-docker.yml`, which dispatches the `plugin-compat` workflow in [2220545672/dsh-docker](https://github.com/2220545672/dsh-docker).
-- dsh-docker runs the same compatibility smoke on every `main` update and once a day: install the current DSH version plus this plugin, boot the web server, and assert the plugin is in the live client bundle graph.
-- A failure opens an issue in dsh-docker (or comments on the existing one); the workflow's own `GITHUB_TOKEN` is enough for that.
-- One-time setup: add a `CROSS_REPO_TOKEN` secret in this repository (Settings → Secrets and variables → Actions). A classic token needs `repo`; a fine-grained token needs **Contents: read and write** on `2220545672/dsh-docker` for repository dispatch. Without it, the immediate dispatch is skipped, but dsh-docker's push/daily test still runs.
+- **The trigger is dsh-docker following an upstream DSH update**: before publishing a new image, dsh-docker installs the current **stable** plugin and runs the compatibility test.
+- A failure blocks the image publish and opens an issue in dsh-docker (or comments on the existing one).
+- A plugin release here does **not** trigger dsh-docker: a stable plugin should not need to release just because dsh-docker did.
+- Manual re-run: dsh-docker → Actions → `plugin-compat` → Run workflow.
 
 ## Compatibility
 

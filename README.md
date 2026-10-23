@@ -97,10 +97,10 @@ dsh plugin --profile web add /path/to/dsh-context-editor
 
 ## 与 dsh-docker 联动
 
-- 本仓库发布 release 后，`.github/workflows/notify-dsh-docker.yml` 会触发 [2220545672/dsh-docker](https://github.com/2220545672/dsh-docker) 的 `plugin-compat` 工作流；
-- dsh-docker 在自身 `main` 更新和每日定时任务里也会跑同一套兼容测试：装当前 DSH 版本 + 本插件，启动 web，确认插件进入客户端 bundle 图；
-- 测试失败会在 dsh-docker 自动建 issue（同标题已存在则追加评论），不需要额外的 issue token；
-- 首次配置：在 GitHub 本仓库 Settings → Secrets and variables → Actions 添加 `CROSS_REPO_TOKEN`。classic token 需要 `repo`；fine-grained token 需要对 `2220545672/dsh-docker` 的 **Contents: read and write**（repository dispatch）。没有这个 secret 时立即触发会跳过，但 dsh-docker 的 push/每日测试仍会运行。
+- **触发方向是 dsh-docker 跟随上游 DSH 更新**：dsh-docker 在发布新镜像前，会安装本插件的**当前稳定版**并跑兼容测试；
+- 测试失败会阻止镜像发布，并在 dsh-docker 自动建 issue（同标题已存在则追加评论）；
+- 本仓库发布新插件版本**不会**反向触发 dsh-docker：插件稳定时不需要为了 dsh-docker 发版；
+- 手动重跑：dsh-docker → Actions → `plugin-compat` → Run workflow。
 
 ## 兼容性
 
