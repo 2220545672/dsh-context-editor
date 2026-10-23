@@ -1,0 +1,49 @@
+name: notify-dsh-docker
+
+# The plugin's compatibility test lives in dsh-docker because that repository
+# owns the DSH version the image ships. A release here dispatches the test there;
+# if the test fails, dsh-docker opens an issue automatically.
+#
+# Requires the CROSS_REPO_TOKEN secret in this repository: a GitHub token that
+# can send repository dispatches to 2220545672/dsh-docker (classic `repo`, or a
+# fine-grained token with Contents: read and write on that repository).
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Plugin version to test (latest or exact)'
+        required: false
+        default: 'latest'
+
+permissions:
+  contents: read
+
+jobs:
+  dispatch:
+    name: trigger dsh-docker compatibility test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch
+        env:
+          CROSS_REPO_TOKEN: ${{ secrets.CROSS_REPO_TOKEN }}
+          EVENT_VERSION: ${{ github.event.release.tag_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          version="${EVENT_VERSION:-${INPUT_VERSION:-latest}}"
+          version="${version#v}"
+          if [[ -z "${CROSS_REPO_TOKEN}" ]]; then
+            echo '::warning::CROSS_REPO_TOKEN is not configured; skipping the dispatch. dsh-docker still tests the latest plugin on its daily schedule.'
+            exit 0
+          fi
+          printf 'dispatching dsh-docker compatibility test for dsh-context-editor@%s\n' "${version}"
+          curl --fail --silent --show-error \
+            --request POST \
+            --header "Authorization: Bearer ${CROSS_REPO_TOKEN}" \
+            --header 'Accept: application/vnd.github+json' \
+            --header 'X-GitHub-Api-Version: 2022-11-28' \
+            --data "{\"event_type\":\"context-editor-updated\",\"client_payload\":{\"plugin_version\":\"${version}\"}}" \
+            https://api.github.com/repos/2220545672/dsh-docker/dispatches
