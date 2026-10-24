@@ -69,7 +69,8 @@
     "build": "tsc -p tsconfig.json && tsc -p tsconfig.client.json && tsdown",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit",
     "prepublishOnly": "pnpm build",
-    "test": "node test/edit-blocks.mjs"
+    "test": "node test/edit-blocks.mjs",
+    "compat": "bash scripts/compat-image.sh"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",

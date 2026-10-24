@@ -95,34 +95,29 @@ dsh plugin --profile web add /path/to/dsh-context-editor
 
 写这插件的时候顺手修了个烦人的 bug：以前你对其中一个编辑框「全选（Ctrl/Cmd+A）→ 删除」，另一个框的内容也会跟着被清空。原因是选区在弹窗里串了，两个相邻输入框被一起选中了。现在全选只影响你当前正编辑的那一栏，不会误伤隔壁。
 
-## 与 dsh-docker 联动
+## 与 dsh-docker 的兼容性测试
 
-- **触发方向是 dsh-docker 跟随上游 DSH 更新**：dsh-docker 在发布新镜像前，会安装本插件的**当前稳定版**并跑兼容测试；测试失败会阻止镜像发布。
-- **测试失败自动建 issue 到本仓库**：dsh-docker 用 `repository_dispatch`（`plugin-compat-failed`）把失败转过来，由本仓库的 [plugin-compat-issue.yml](.github/workflows/plugin-compat-issue.yml) 建 issue（同标题已存在则追加评论）。issue 建在这里，是因为要修的是插件。
-- 为什么不用 dsh-docker 直接建：GitHub Actions 的 `GITHUB_TOKEN` 只能写自己所在仓库，跨仓库写 issue 必须靠一个 token。把 token 放在**发送方**（dsh-docker）并只给它 dispatch 权限，比在 dsh-docker 里塞一个能写本仓库 issue 的 token 风险小。
-- 没配 token 时不会丢失败：dsh-docker 会退化为在自己的仓库建 issue（标题带 `(fallback)`）。
-- 手动重跑：dsh-docker → Actions → `plugin-compat` → Run workflow。本仓库也可以用 `plugin-compat-issue` 手动补建一次失败 issue。
+测试在**本仓库**跑（插件是被测对象，要修的东西也在这里），dsh-docker 不需要做任何配置：
 
-### 需要配置的 secret（只有一个，且在 dsh-docker 仓库）
+- 触发器：本仓库 push 到 main、每天一次定时、手动；
+- 手动时可以指定镜像 tag，也可以指定插件版本；**留空则用当前 commit 打包安装**，所以未发布的改动也会被测；
+- 测试内容（[`scripts/compat-image.sh`](scripts/compat-image.sh)）：拉镜像 → 启动 → 用镜像自带 pnpm 以 uid 1000 装插件 → 正常重启 → 确认插件进入 `/plugins/events` 的客户端 bundle 图 → 确认启动日志没有 `did not activate`；
+- 失败会在**本仓库**建 issue，标题按镜像 digest 归一（同一镜像反复失败只追加评论）。
 
-| 项 | 值 |
-|---|---|
-| 仓库 | `2220545672/dsh-docker`（**不是**本仓库） |
-| 位置 | Settings → Secrets and variables → Actions → New repository secret |
-| Name | `CROSS_REPO_TOKEN` |
-| Secret | 一个 GitHub token，只要这一个能力：能向 `2220545672/dsh-context-editor` 发 repository dispatch |
+### 为什么不需要跨仓库 token
 
-**它的作用**：dsh-docker 测完插件失败时，需要用它在目标仓库触发一个 `repository_dispatch` 事件；GitHub 侧只有带该权限的 token 才能发。没有它时，dsh-docker 会退化为在自己仓库建 issue。
+GHCR 上的镜像是公开的，本仓库直接匿名拉取并按 digest 判断是否变化，所以：
 
-**推荐用 fine-grained token**（权限最小）：
+- dsh-docker 里**没有**任何插件相关配置，也没给本仓库发事件；
+- 本仓库**不需要**任何 secret；
+- 镜像更新后，最迟第二天的定时任务就会测到；想立刻测就手动 Run workflow。
 
-1. GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token；
-2. Repository access → **Only select repositories** → 只勾 `2220545672/dsh-context-editor`；
-3. Permissions → Repository permissions → **Contents: Read and write**（repository dispatch 走这个权限）；
-4. 其余权限全部保持 **No access**；Expiration 按需（到期后换新，只需更新这一个 secret）；
-5. 生成后复制 `github_pat_…`，填进上面 dsh-docker 的 `CROSS_REPO_TOKEN`。
+工作流：[`.github/workflows/compat.yml`](.github/workflows/compat.yml)
 
-如果你图省事也可以用 classic token（勾 `repo`），但它能读写该账号下**所有**仓库，不如 fine-grained 安全。
+```bash
+# 本地复现（需要 Docker）
+bash scripts/compat-image.sh ghcr.io/2220545672/dsh:latest dsh-context-editor@0.2.0
+```
 
 ## 兼容性
 

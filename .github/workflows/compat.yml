@@ -1,0 +1,215 @@
+name: compat
+
+# Compatibility test for this plugin against the DSH image users actually run.
+#
+# The test lives here because the plugin is the subject under test and this is
+# where a fix lands. Nothing needs to be configured in dsh-docker and no
+# cross-repository token is involved: the published image on GHCR is public, so
+# this repository polls it by digest and tests whenever it changes.
+#
+# Triggers:
+#   * push to main — the plugin changed, re-test against the current image;
+#   * daily — catch a new image even when this repository is idle;
+#   * manual — pick any image tag and any plugin version.
+#
+# The digest comparison is what makes the daily run cheap: when the image has
+# not changed since the last successful test, the job stops after one API call.
+# Force it with the `force` input.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      image:
+        description: 'Image to test'
+        required: false
+        default: 'ghcr.io/2220545672/dsh:latest'
+      plugin_version:
+        description: 'Plugin version to install (empty = build this commit locally)'
+        required: false
+        default: ''
+      force:
+        description: 'Test even when this image digest already passed'
+        type: boolean
+        required: false
+        default: false
+  schedule:
+    - cron: '23 6 * * *'
+
+permissions:
+  contents: read
+  # A failure opens an issue here, where the fix belongs.
+  issues: write
+  # The digest cache lives in the Actions cache, not in a branch.
+  actions: write
+
+concurrency:
+  group: compat-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE: ${{ inputs.image || 'ghcr.io/2220545672/dsh:latest' }}
+
+jobs:
+  compat:
+    name: plugin inside the DSH image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Resolve the image digest
+        id: digest
+        run: |
+          set -euo pipefail
+          repo="${IMAGE#ghcr.io/}"
+          repo="${repo%%:*}"
+          tag="${IMAGE##*:}"
+          token="$(curl --fail --silent --show-error \
+            "https://ghcr.io/token?scope=repository:${repo}:pull&service=ghcr.io" \
+            | jq -r .token)"
+          digest="$(curl --fail --silent --show-error --head \
+            --header "Authorization: Bearer ${token}" \
+            --header 'Accept: application/vnd.oci.image.index.v1+json' \
+            --header 'Accept: application/vnd.docker.distribution.manifest.list.v2+json' \
+            "https://ghcr.io/v2/${repo}/manifests/${tag}" \
+            | tr -d '\r' | awk 'tolower($1) == "docker-content-digest:" { print $2 }')"
+          if [[ -z "${digest}" ]]; then
+            echo "could not resolve a digest for ${IMAGE}" >&2
+            exit 1
+          fi
+          echo "digest=${digest}" >> "${GITHUB_OUTPUT}"
+          echo "Resolved ${IMAGE} -> ${digest}" >> "${GITHUB_STEP_SUMMARY}"
+
+      # The daily run should not burn ten minutes on an unchanged image. The
+      # cache key is the digest, so the marker is written once per image and
+      # restored on every later run; `force` bypasses the skip.
+      - name: Restore the last tested digest
+        id: cache
+        if: ${{ !inputs.force }}
+        uses: actions/cache/restore@v4
+        with:
+          path: .compat-tested
+          key: compat-tested-${{ steps.digest.outputs.digest }}
+
+      - name: Decide whether to test
+        id: decide
+        env:
+          FORCE: ${{ inputs.force }}
+          DIGEST: ${{ steps.digest.outputs.digest }}
+          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+        run: |
+          set -euo pipefail
+          if [[ "${FORCE}" == "true" ]]; then
+            echo 'run=true' >> "${GITHUB_OUTPUT}"
+            echo '::notice::force=true, testing anyway'
+          elif [[ "${CACHE_HIT}" == "true" ]]; then
+            echo 'run=false' >> "${GITHUB_OUTPUT}"
+            echo "::notice::${IMAGE} at ${DIGEST} already passed; nothing to do"
+            {
+              echo
+              echo 'Skipped: this image digest already passed the compatibility test.'
+              echo 'Use *Run workflow* with `force` to repeat it.'
+            } >> "${GITHUB_STEP_SUMMARY}"
+          else
+            echo 'run=true' >> "${GITHUB_OUTPUT}"
+            echo '::notice::new image digest, testing'
+          fi
+
+      - name: Pull the image
+        if: steps.decide.outputs.run == 'true'
+        run: docker pull "${IMAGE}"
+
+      # The install runs as uid 1000 inside the container, so a tarball built on
+      # the runner has to be readable by that uid once copied in.
+      - name: Make the workspace readable for the container uid
+        if: steps.decide.outputs.run == 'true'
+        run: chmod -R a+rX "${RUNNER_TEMP}" 2>/dev/null || true
+
+      # An empty plugin_version means "the code in this commit": build the
+      # tarball and install that, so a pull request is tested before it is
+      # published. A named version installs from npm instead.
+      - name: Build this commit
+        id: build
+        if: steps.decide.outputs.run == 'true' && inputs.plugin_version == ''
+        run: |
+          set -euo pipefail
+          npm pack --pack-destination "${RUNNER_TEMP}" >/dev/null
+          tarball="$(ls "${RUNNER_TEMP}"/dsh-context-editor-*.tgz | head -n1)"
+          chmod 0644 "${tarball}"
+          echo "spec=${tarball}" >> "${GITHUB_OUTPUT}"
+          echo "Built ${tarball} from ${GITHUB_SHA}" >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Compatibility test inside the image
+        id: compat
+        if: steps.decide.outputs.run == 'true'
+        env:
+          PLUGIN_SPEC: ${{ inputs.plugin_version && format('dsh-context-editor@{0}', inputs.plugin_version) || steps.build.outputs.spec }}
+        run: |
+          set -euo pipefail
+          bash scripts/compat-image.sh "${IMAGE}" "${PLUGIN_SPEC}" | tee "${RUNNER_TEMP}/compat.log"
+          {
+            echo
+            echo '### Compatibility result'
+            echo
+            echo '```'
+            cat "${RUNNER_TEMP}/compat.log"
+            echo '```'
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Mark this digest as tested
+        if: steps.compat.outcome == 'success'
+        uses: actions/cache/save@v4
+        with:
+          path: .compat-tested
+          key: compat-tested-${{ steps.digest.outputs.digest }}
+
+      - name: Open or update the failure issue
+        if: failure() && steps.decide.outputs.run == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DIGEST: ${{ steps.digest.outputs.digest }}
+          PLUGIN_SPEC: ${{ inputs.plugin_version && format('dsh-context-editor@{0}', inputs.plugin_version) || steps.build.outputs.spec }}
+        run: |
+          set -euo pipefail
+          # The title keys on the image digest, so one issue tracks one image
+          # until it is fixed; a later failure on the same digest comments
+          # instead of opening a duplicate.
+          short="${DIGEST#sha256:}"
+          title="[compat] ${IMAGE##*/}@${short:0:12} fails with this plugin"
+          body="$(mktemp)"
+          {
+            echo 'The compatibility test failed.'
+            echo
+            echo "- image: \`${IMAGE}\`"
+            echo "- image digest: \`${DIGEST}\`"
+            echo "- plugin: \`${PLUGIN_SPEC}\`"
+            echo "- commit: \`${GITHUB_SHA}\`"
+            echo "- run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo
+            if [[ -f "${RUNNER_TEMP}/compat.log" ]]; then
+              echo '### Test output'
+              echo
+              echo '```'
+              tail -n 80 "${RUNNER_TEMP}/compat.log"
+              echo '```'
+              echo
+            fi
+            echo 'Reproduce locally (needs Docker):'
+            echo
+            echo '```bash'
+            echo "bash scripts/compat-image.sh ${IMAGE} ${PLUGIN_SPEC}"
+            echo '```'
+          } > "${body}"
+          existing="$(gh issue list --repo "${GITHUB_REPOSITORY}" --state open \
+            --search "compat in:title" --json number,title \
+            | jq -r --arg title "${title}" '.[] | select(.title == $title) | .number' | head -n1)"
+          if [[ -n "${existing}" ]]; then
+            gh issue comment "${existing}" --repo "${GITHUB_REPOSITORY}" --body-file "${body}"
+          else
+            gh issue create --repo "${GITHUB_REPOSITORY}" --title "${title}" --body-file "${body}"
+          fi

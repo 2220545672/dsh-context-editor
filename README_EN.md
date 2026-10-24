@@ -62,38 +62,34 @@ Close it with the native Modal ×, Esc, a backdrop click, or the footer **Close*
 
 While writing this I fixed an annoying one: previously, select-all (Ctrl/Cmd+A) → delete in one editor would also wipe the sibling editor. The text selection was leaking across the two adjacent boxes, so deleting grabbed both. Now select-all only touches the field you're actually editing.
 
-## dsh-docker integration
+## Compatibility testing against dsh-docker
 
-- **The trigger is dsh-docker following an upstream DSH update**: before publishing a new image, dsh-docker installs the current **stable** plugin and runs the compatibility test.
-- A failure blocks the image publish and opens an issue **in this repository** (or comments on the existing one): dsh-docker sends a `repository_dispatch` (`plugin-compat-failed`) and [plugin-compat-issue.yml](.github/workflows/plugin-compat-issue.yml) files it here, where the fix lands.
-- Why not directly from dsh-docker: a workflow's `GITHUB_TOKEN` can only write to its own repository. Keeping a dispatch-only token on the sending side is narrower than storing an issue-writing token for this repository over there.
-- Without that token nothing is lost: dsh-docker falls back to an issue in its own repository, titled `(fallback)`.
-- A plugin release here does **not** trigger dsh-docker: a stable plugin should not need to release just because dsh-docker did.
-- Manual re-run: dsh-docker → Actions → `plugin-compat` → Run workflow. This repository's `plugin-compat-issue` workflow can also file a missing report by hand.
+The test runs **in this repository** — the plugin is the subject under test and
+this is where a fix lands — and dsh-docker needs no configuration at all:
 
-### The one secret to configure (in dsh-docker, not here)
+- Triggers: push to main, a daily schedule, and manual runs.
+- A manual run can name an image tag and a plugin version; leaving the version
+  empty packs **this commit** and installs that, so unpublished changes are
+  tested too.
+- What it asserts ([`scripts/compat-image.sh`](scripts/compat-image.sh)): pull the image, boot it, install the plugin with the image's own pnpm as uid 1000, restart normally, confirm the plugin reaches the client bundle graph served at `/plugins/events`, and confirm the boot log has no `did not activate`.
+- A failure opens an issue **here**, keyed by image digest so a repeating
+  failure on one image comments instead of duplicating.
 
-| Field | Value |
-|---|---|
-| Repository | `2220545672/dsh-docker` — **not** this one |
-| Location | Settings → Secrets and variables → Actions → New repository secret |
-| Name | `CROSS_REPO_TOKEN` |
-| Secret | a GitHub token whose only capability is sending repository dispatches to `2220545672/dsh-context-editor` |
+### Why no cross-repository token
 
-**What it does**: when dsh-docker's plugin test fails, it must fire a `repository_dispatch`
-event at the plugin repository, and only a token with that permission is allowed to.
-Without it, dsh-docker falls back to filing the issue in its own repository.
+The image on GHCR is public, so this repository pulls it anonymously and uses
+its digest to decide whether anything changed:
 
-**Prefer a fine-grained token**:
+- dsh-docker holds **no** plugin-specific configuration and dispatches nothing;
+- this repository needs **no** secrets;
+- a new image is picked up by the next daily run, or immediately by *Run workflow*.
 
-1. GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token.
-2. Repository access → **Only select repositories** → pick only `2220545672/dsh-context-editor`.
-3. Permissions → Repository permissions → **Contents: Read and write** (repository dispatch uses this).
-4. Leave everything else at **No access**; set an expiry and rotate the secret when it lapses.
-5. Copy the `github_pat_…` value into `CROSS_REPO_TOKEN` above.
+Workflow: [`.github/workflows/compat.yml`](.github/workflows/compat.yml)
 
-A classic token with `repo` also works, but it can read and write every repository on the
-account — the fine-grained one is the safer choice.
+```bash
+# reproduce locally (needs Docker)
+bash scripts/compat-image.sh ghcr.io/2220545672/dsh:latest dsh-context-editor@0.2.0
+```
 
 ## Compatibility
 
