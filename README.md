@@ -103,6 +103,27 @@ dsh plugin --profile web add /path/to/dsh-context-editor
 - 没配 token 时不会丢失败：dsh-docker 会退化为在自己的仓库建 issue（标题带 `(fallback)`）。
 - 手动重跑：dsh-docker → Actions → `plugin-compat` → Run workflow。本仓库也可以用 `plugin-compat-issue` 手动补建一次失败 issue。
 
+### 需要配置的 secret（只有一个，且在 dsh-docker 仓库）
+
+| 项 | 值 |
+|---|---|
+| 仓库 | `2220545672/dsh-docker`（**不是**本仓库） |
+| 位置 | Settings → Secrets and variables → Actions → New repository secret |
+| Name | `CROSS_REPO_TOKEN` |
+| Secret | 一个 GitHub token，只要这一个能力：能向 `2220545672/dsh-context-editor` 发 repository dispatch |
+
+**它的作用**：dsh-docker 测完插件失败时，需要用它在目标仓库触发一个 `repository_dispatch` 事件；GitHub 侧只有带该权限的 token 才能发。没有它时，dsh-docker 会退化为在自己仓库建 issue。
+
+**推荐用 fine-grained token**（权限最小）：
+
+1. GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token；
+2. Repository access → **Only select repositories** → 只勾 `2220545672/dsh-context-editor`；
+3. Permissions → Repository permissions → **Contents: Read and write**（repository dispatch 走这个权限）；
+4. 其余权限全部保持 **No access**；Expiration 按需（到期后换新，只需更新这一个 secret）；
+5. 生成后复制 `github_pat_…`，填进上面 dsh-docker 的 `CROSS_REPO_TOKEN`。
+
+如果你图省事也可以用 classic token（勾 `repo`），但它能读写该账号下**所有**仓库，不如 fine-grained 安全。
+
 ## 兼容性
 
 - 目标版本：DeepSeek Harness `0.2.1-rc.2`（peer 区间 `^0.2.1-rc.2`；插件版本 `0.2.0`）；

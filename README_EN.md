@@ -69,7 +69,31 @@ While writing this I fixed an annoying one: previously, select-all (Ctrl/Cmd+A) 
 - Why not directly from dsh-docker: a workflow's `GITHUB_TOKEN` can only write to its own repository. Keeping a dispatch-only token on the sending side is narrower than storing an issue-writing token for this repository over there.
 - Without that token nothing is lost: dsh-docker falls back to an issue in its own repository, titled `(fallback)`.
 - A plugin release here does **not** trigger dsh-docker: a stable plugin should not need to release just because dsh-docker did.
-- Manual re-run: dsh-docker → Actions → `plugin-compat` → Run workflow.
+- Manual re-run: dsh-docker → Actions → `plugin-compat` → Run workflow. This repository's `plugin-compat-issue` workflow can also file a missing report by hand.
+
+### The one secret to configure (in dsh-docker, not here)
+
+| Field | Value |
+|---|---|
+| Repository | `2220545672/dsh-docker` — **not** this one |
+| Location | Settings → Secrets and variables → Actions → New repository secret |
+| Name | `CROSS_REPO_TOKEN` |
+| Secret | a GitHub token whose only capability is sending repository dispatches to `2220545672/dsh-context-editor` |
+
+**What it does**: when dsh-docker's plugin test fails, it must fire a `repository_dispatch`
+event at the plugin repository, and only a token with that permission is allowed to.
+Without it, dsh-docker falls back to filing the issue in its own repository.
+
+**Prefer a fine-grained token**:
+
+1. GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token.
+2. Repository access → **Only select repositories** → pick only `2220545672/dsh-context-editor`.
+3. Permissions → Repository permissions → **Contents: Read and write** (repository dispatch uses this).
+4. Leave everything else at **No access**; set an expiry and rotate the secret when it lapses.
+5. Copy the `github_pat_…` value into `CROSS_REPO_TOKEN` above.
+
+A classic token with `repo` also works, but it can read and write every repository on the
+account — the fine-grained one is the safer choice.
 
 ## Compatibility
 
