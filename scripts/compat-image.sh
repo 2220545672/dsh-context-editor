@@ -4,7 +4,7 @@
 #
 #   scripts/compat-image.sh [image] [plugin-spec]
 #
-# Defaults: image `ghcr.io/2220545672/dsh:latest`, plugin `dsh-context-editor@latest`.
+# Defaults: image `ghcr.io/meixu6693/dsh:latest`, plugin `dsh-context-editor@latest`.
 #
 # plugin-spec is whatever `dsh plugin add` accepts: a version range
 # (`dsh-context-editor@0.2.0`), a tarball path (so CI can test an unpacked
@@ -30,7 +30,7 @@
 #   GITHUB_OUTPUT     when set, `dsh_version=<version>` is appended for CI
 set -Eeuo pipefail
 
-IMAGE="${1:-ghcr.io/2220545672/dsh:latest}"
+IMAGE="${1:-ghcr.io/meixu6693/dsh:latest}"
 PLUGIN_SPEC="${2:-dsh-context-editor@latest}"
 PORT="${COMPAT_PORT:-$((18090 + RANDOM % 1000))}"
 NAME="dsh-compat-$$"

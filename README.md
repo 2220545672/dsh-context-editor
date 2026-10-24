@@ -73,7 +73,7 @@ dsh plugin --profile web add dsh-context-editor@0.2.0
 想改源码、跟着一起折腾的，clone 下来走本地路径挂也行：
 
 ```bash
-git clone https://github.com/2220545672/dsh-context-editor.git
+git clone https://github.com/MeiXu6693/dsh-context-editor.git
 dsh plugin --profile web add /path/to/dsh-context-editor
 ```
 
@@ -116,7 +116,7 @@ GHCR 上的镜像是公开的，本仓库直接匿名拉取并按 digest 判断�
 
 ```bash
 # 本地复现（需要 Docker）
-bash scripts/compat-image.sh ghcr.io/2220545672/dsh:latest dsh-context-editor@0.2.0
+bash scripts/compat-image.sh ghcr.io/meixu6693/dsh:latest dsh-context-editor@0.2.0
 ```
 
 ## 兼容性

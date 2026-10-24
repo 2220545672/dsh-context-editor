@@ -4,11 +4,11 @@
   "description": "DeepSeek Harness (DSH) plugin: edit a finalized assistant reply and its reasoning/thinking chain right in the conversation. A pencil action opens a single-message editor; edits become a plugin message projection, so the model and the UI only ever see your version. Adapted for DSH 0.2.1-rc.2.",
   "repository": {
     "type": "git",
-    "url": "https://github.com/2220545672/dsh-context-editor.git"
+    "url": "https://github.com/MeiXu6693/dsh-context-editor.git"
   },
-  "homepage": "https://github.com/2220545672/dsh-context-editor",
+  "homepage": "https://github.com/MeiXu6693/dsh-context-editor",
   "bugs": {
-    "url": "https://github.com/2220545672/dsh-context-editor/issues"
+    "url": "https://github.com/MeiXu6693/dsh-context-editor/issues"
   },
   "keywords": [
     "deepseek",

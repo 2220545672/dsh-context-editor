@@ -24,7 +24,7 @@ on:
       image:
         description: 'Image to test'
         required: false
-        default: 'ghcr.io/2220545672/dsh:latest'
+        default: 'ghcr.io/meixu6693/dsh:latest'
       plugin_version:
         description: 'Plugin version to install (empty = build this commit locally)'
         required: false
@@ -49,7 +49,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  IMAGE: ${{ inputs.image || 'ghcr.io/2220545672/dsh:latest' }}
+  IMAGE: ${{ inputs.image || 'ghcr.io/meixu6693/dsh:latest' }}
 
 jobs:
   compat:

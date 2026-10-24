@@ -40,7 +40,7 @@ You need DeepSeek Harness (`dsh`, `0.2.1-rc.2` or newer 0.2.x).
 dsh plugin --profile web add dsh-context-editor@0.2.0
 
 # or clone and mount from a local path
-git clone https://github.com/2220545672/dsh-context-editor.git
+git clone https://github.com/MeiXu6693/dsh-context-editor.git
 dsh plugin --profile web add /path/to/dsh-context-editor
 ```
 
@@ -88,7 +88,7 @@ Workflow: [`.github/workflows/compat.yml`](.github/workflows/compat.yml)
 
 ```bash
 # reproduce locally (needs Docker)
-bash scripts/compat-image.sh ghcr.io/2220545672/dsh:latest dsh-context-editor@0.2.0
+bash scripts/compat-image.sh ghcr.io/meixu6693/dsh:latest dsh-context-editor@0.2.0
 ```
 
 ## Compatibility
