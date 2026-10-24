@@ -65,7 +65,9 @@ While writing this I fixed an annoying one: previously, select-all (Ctrl/Cmd+A) 
 ## dsh-docker integration
 
 - **The trigger is dsh-docker following an upstream DSH update**: before publishing a new image, dsh-docker installs the current **stable** plugin and runs the compatibility test.
-- A failure blocks the image publish and opens an issue in dsh-docker (or comments on the existing one).
+- A failure blocks the image publish and opens an issue **in this repository** (or comments on the existing one): dsh-docker sends a `repository_dispatch` (`plugin-compat-failed`) and [plugin-compat-issue.yml](.github/workflows/plugin-compat-issue.yml) files it here, where the fix lands.
+- Why not directly from dsh-docker: a workflow's `GITHUB_TOKEN` can only write to its own repository. Keeping a dispatch-only token on the sending side is narrower than storing an issue-writing token for this repository over there.
+- Without that token nothing is lost: dsh-docker falls back to an issue in its own repository, titled `(fallback)`.
 - A plugin release here does **not** trigger dsh-docker: a stable plugin should not need to release just because dsh-docker did.
 - Manual re-run: dsh-docker → Actions → `plugin-compat` → Run workflow.
 

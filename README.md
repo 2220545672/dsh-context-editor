@@ -97,10 +97,11 @@ dsh plugin --profile web add /path/to/dsh-context-editor
 
 ## 与 dsh-docker 联动
 
-- **触发方向是 dsh-docker 跟随上游 DSH 更新**：dsh-docker 在发布新镜像前，会安装本插件的**当前稳定版**并跑兼容测试；
-- 测试失败会阻止镜像发布，并在 dsh-docker 自动建 issue（同标题已存在则追加评论）；
-- 本仓库发布新插件版本**不会**反向触发 dsh-docker：插件稳定时不需要为了 dsh-docker 发版；
-- 手动重跑：dsh-docker → Actions → `plugin-compat` → Run workflow。
+- **触发方向是 dsh-docker 跟随上游 DSH 更新**：dsh-docker 在发布新镜像前，会安装本插件的**当前稳定版**并跑兼容测试；测试失败会阻止镜像发布。
+- **测试失败自动建 issue 到本仓库**：dsh-docker 用 `repository_dispatch`（`plugin-compat-failed`）把失败转过来，由本仓库的 [plugin-compat-issue.yml](.github/workflows/plugin-compat-issue.yml) 建 issue（同标题已存在则追加评论）。issue 建在这里，是因为要修的是插件。
+- 为什么不用 dsh-docker 直接建：GitHub Actions 的 `GITHUB_TOKEN` 只能写自己所在仓库，跨仓库写 issue 必须靠一个 token。把 token 放在**发送方**（dsh-docker）并只给它 dispatch 权限，比在 dsh-docker 里塞一个能写本仓库 issue 的 token 风险小。
+- 没配 token 时不会丢失败：dsh-docker 会退化为在自己的仓库建 issue（标题带 `(fallback)`）。
+- 手动重跑：dsh-docker → Actions → `plugin-compat` → Run workflow。本仓库也可以用 `plugin-compat-issue` 手动补建一次失败 issue。
 
 ## 兼容性
 
